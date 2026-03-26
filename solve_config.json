@@ -1,0 +1,27 @@
+{
+  "gausian_config": {
+    "adaptive_gauss_fit": true,
+    "adaptive_threshold": 0.003,
+    "adaptive_n_sigma": 3.0,
+    "adaptive_max_iter": 10,
+    "adaptive_min_half_w": 1,
+    "adaptive_max_half_w": 5,
+    "fixed_threshold": 0.008,
+    "fixed_window_size": 4
+  },
+  "optimize_param": {
+    "model": "sRT",
+    "use_means_for_ransac": false,
+    "ransac_method": "RANSAC",
+    "ransac_reproj_threshold": 3.0,
+    "ransac_max_iters": 5000,
+    "ransac_confidence": 0.995,
+    "robust_loss": "huber",
+    "f_scale": 2.0,
+    "max_nfev": 5000,
+    "srt_x_scale": [0.2, 1.0, 1.0, 1.0],
+    "srt_bounds_profile": "default",
+    "srt_scale_reg_weight": 0.01,
+    "srt_rot_reg_weight": 0.001
+  }
+}

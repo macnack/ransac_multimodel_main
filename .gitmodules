@@ -1,0 +1,3 @@
+[submodule "ransac_multimodal"]
+	path = ransac_multimodal
+	url = git@github.com:macnack/ransac_multimodal.git
