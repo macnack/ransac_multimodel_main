@@ -1,0 +1,68 @@
+{
+  "model": "full",
+  "repeats": 5,
+  "warmup": 2,
+  "f_scale": 2.0,
+  "max_iter_scipy": 5000,
+  "max_iter_theseus": 30,
+  "step_size_theseus": 1.0,
+  "rows": [
+    {
+      "sample_id": 98,
+      "n_points": 230,
+      "model": "full",
+      "scipy": {
+        "time_ms_median": 3237.6804779923987,
+        "time_ms_p95": 3298.312792601064,
+        "corner_error_px": 229.41687697140486
+      },
+      "theseus": {
+        "time_ms_median": 224.91358799743466,
+        "time_ms_p95": 242.67072059737984,
+        "corner_error_px": 1438.4898428996798
+      },
+      "ransac_init": {
+        "corner_error_px": 344.4637897382486
+      },
+      "H_diff_frobenius": 5.9395942135067745
+    },
+    {
+      "sample_id": 122,
+      "n_points": 349,
+      "model": "full",
+      "scipy": {
+        "time_ms_median": 3807.974810988526,
+        "time_ms_p95": 3869.4313571962994,
+        "corner_error_px": 149.38793432247783
+      },
+      "theseus": {
+        "time_ms_median": 258.7844980007503,
+        "time_ms_p95": 259.7790189902298,
+        "corner_error_px": 1175.9489674703002
+      },
+      "ransac_init": {
+        "corner_error_px": 2249.099864036949
+      },
+      "H_diff_frobenius": 175.22599775831094
+    },
+    {
+      "sample_id": 128,
+      "n_points": 196,
+      "model": "full",
+      "scipy": {
+        "time_ms_median": 56.53653800254688,
+        "time_ms_p95": 56.624399608699605,
+        "corner_error_px": 243.33129604867128
+      },
+      "theseus": {
+        "time_ms_median": 207.5790390081238,
+        "time_ms_p95": 209.2345063923858,
+        "corner_error_px": 253.98066963070238
+      },
+      "ransac_init": {
+        "corner_error_px": 246.55165339027195
+      },
+      "H_diff_frobenius": 0.8594607571199576
+    }
+  ]
+}
