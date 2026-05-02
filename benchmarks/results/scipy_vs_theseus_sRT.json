@@ -1,0 +1,87 @@
+{
+  "model": "sRT",
+  "repeats": 5,
+  "warmup": 2,
+  "f_scale": 2.0,
+  "max_iter_scipy": 5000,
+  "max_iter_theseus": 30,
+  "step_size_theseus": 1.0,
+  "rows": [
+    {
+      "sample_id": -1,
+      "n_points": 196,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 49.08648099808488,
+        "time_ms_p95": 50.97055379883386,
+        "corner_error_px": 0.023956869084169684
+      },
+      "theseus": {
+        "time_ms_median": 187.54660000558943,
+        "time_ms_p95": 188.36838459828869,
+        "corner_error_px": 0.021321601010747492
+      },
+      "ransac_init": {
+        "corner_error_px": 0.23756047134193298
+      },
+      "H_diff_frobenius": 0.020009878281847037
+    },
+    {
+      "sample_id": 98,
+      "n_points": 230,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 126.80099900171626,
+        "time_ms_p95": 133.1438376015285,
+        "corner_error_px": 115.76866965355191
+      },
+      "theseus": {
+        "time_ms_median": 197.96504800615367,
+        "time_ms_p95": 208.5347576008644,
+        "corner_error_px": 425.91269721482774
+      },
+      "ransac_init": {
+        "corner_error_px": 344.4637897382486
+      },
+      "H_diff_frobenius": 14.5931847068002
+    },
+    {
+      "sample_id": 122,
+      "n_points": 349,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 64.7143789974507,
+        "time_ms_p95": 68.05301299318671,
+        "corner_error_px": 339.87420706535266
+      },
+      "theseus": {
+        "time_ms_median": 231.24223899503704,
+        "time_ms_p95": 232.24887180549558,
+        "corner_error_px": NaN
+      },
+      "ransac_init": {
+        "corner_error_px": 2249.099864036949
+      },
+      "H_diff_frobenius": 280.6524597258461
+    },
+    {
+      "sample_id": 128,
+      "n_points": 196,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 165.95364699605852,
+        "time_ms_p95": 167.19956319138873,
+        "corner_error_px": 167.7856854943935
+      },
+      "theseus": {
+        "time_ms_median": 186.97106299805455,
+        "time_ms_p95": 192.1560471993871,
+        "corner_error_px": 242.1062825088281
+      },
+      "ransac_init": {
+        "corner_error_px": 246.55165339027195
+      },
+      "H_diff_frobenius": 2.22663994835268
+    }
+  ]
+}

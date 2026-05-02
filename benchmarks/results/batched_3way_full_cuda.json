@@ -1,0 +1,73 @@
+{
+  "sample_id": 128,
+  "rows": [
+    {
+      "batch_size": 1,
+      "n_points": 196,
+      "model": "full",
+      "device": "cuda",
+      "scipy_loop_ms_median": 57.41921400476713,
+      "scipy_loop_ms_p95": 57.68952540529426,
+      "theseus_batch_ms_median": 313.32470700726844,
+      "theseus_batch_ms_p95": 315.4346823008382,
+      "torch_lm_batch_ms_median": 15.11453400598839,
+      "torch_lm_batch_ms_p95": 16.252500300470274,
+      "scipy_per_item_ms": 57.41921400476713,
+      "theseus_per_item_ms": 313.32470700726844,
+      "torch_lm_per_item_ms": 15.11453400598839,
+      "speedup_theseus_over_scipy": 0.18325785589399793,
+      "speedup_torch_lm_over_scipy": 3.798940409411074
+    },
+    {
+      "batch_size": 4,
+      "n_points": 196,
+      "model": "full",
+      "device": "cuda",
+      "scipy_loop_ms_median": 229.07661901263054,
+      "scipy_loop_ms_p95": 235.59276481100824,
+      "theseus_batch_ms_median": 323.0461060011294,
+      "theseus_batch_ms_p95": 325.6959210950299,
+      "torch_lm_batch_ms_median": 14.646638999693096,
+      "torch_lm_batch_ms_p95": 14.814788699732162,
+      "scipy_per_item_ms": 57.269154753157636,
+      "theseus_per_item_ms": 80.76152650028234,
+      "torch_lm_per_item_ms": 3.661659749923274,
+      "speedup_theseus_over_scipy": 0.7091143176071272,
+      "speedup_torch_lm_over_scipy": 15.64021745995314
+    },
+    {
+      "batch_size": 16,
+      "n_points": 196,
+      "model": "full",
+      "device": "cuda",
+      "scipy_loop_ms_median": 931.4897889998974,
+      "scipy_loop_ms_p95": 937.2262513046735,
+      "theseus_batch_ms_median": 512.2887199977413,
+      "theseus_batch_ms_p95": 512.379683907784,
+      "torch_lm_batch_ms_median": 14.686224007164128,
+      "torch_lm_batch_ms_p95": 14.708847300789785,
+      "scipy_per_item_ms": 58.21811181249359,
+      "theseus_per_item_ms": 32.01804499985883,
+      "torch_lm_per_item_ms": 0.917889000447758,
+      "speedup_theseus_over_scipy": 1.818290648687335,
+      "speedup_torch_lm_over_scipy": 63.42609159069784
+    },
+    {
+      "batch_size": 64,
+      "n_points": 196,
+      "model": "full",
+      "device": "cuda",
+      "scipy_loop_ms_median": 3654.712952004047,
+      "scipy_loop_ms_p95": 3711.197284098307,
+      "theseus_batch_ms_median": 1409.0090389945544,
+      "theseus_batch_ms_p95": 1410.6679289019667,
+      "torch_lm_batch_ms_median": 14.966142000048421,
+      "torch_lm_batch_ms_p95": 15.156934795959387,
+      "scipy_per_item_ms": 57.104889875063236,
+      "theseus_per_item_ms": 22.015766234289913,
+      "torch_lm_per_item_ms": 0.23384596875075658,
+      "speedup_theseus_over_scipy": 2.593817960608677,
+      "speedup_torch_lm_over_scipy": 244.1987355186275
+    }
+  ]
+}

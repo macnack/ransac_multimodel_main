@@ -1,0 +1,87 @@
+{
+  "model": "sRT",
+  "repeats": 5,
+  "warmup": 2,
+  "f_scale": 2.0,
+  "max_iter_scipy": 5000,
+  "max_iter_theseus": 100,
+  "step_size_theseus": 0.1,
+  "rows": [
+    {
+      "sample_id": -1,
+      "n_points": 196,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 46.31250900274608,
+        "time_ms_p95": 48.01483540504705,
+        "corner_error_px": 0.023956869084169684
+      },
+      "theseus": {
+        "time_ms_median": 271.093438990647,
+        "time_ms_p95": 279.0749995969236,
+        "corner_error_px": 0.010153199246211745
+      },
+      "ransac_init": {
+        "corner_error_px": 0.23756047134193298
+      },
+      "H_diff_frobenius": 0.004711662108428967
+    },
+    {
+      "sample_id": 98,
+      "n_points": 230,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 125.00731198815629,
+        "time_ms_p95": 129.80275640729815,
+        "corner_error_px": 115.76866965355191
+      },
+      "theseus": {
+        "time_ms_median": 488.8342040067073,
+        "time_ms_p95": 552.3242785973707,
+        "corner_error_px": 229.16270527774583
+      },
+      "ransac_init": {
+        "corner_error_px": 344.4637897382486
+      },
+      "H_diff_frobenius": 4.5340682505279055
+    },
+    {
+      "sample_id": 122,
+      "n_points": 349,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 66.82529600220732,
+        "time_ms_p95": 77.66618980385829,
+        "corner_error_px": 339.87420706535266
+      },
+      "theseus": {
+        "time_ms_median": 738.9103250025073,
+        "time_ms_p95": 748.8153709913604,
+        "corner_error_px": 392.2870646273435
+      },
+      "ransac_init": {
+        "corner_error_px": 2249.099864036949
+      },
+      "H_diff_frobenius": 1.9209940399588152
+    },
+    {
+      "sample_id": 128,
+      "n_points": 196,
+      "model": "sRT",
+      "scipy": {
+        "time_ms_median": 174.70025998773053,
+        "time_ms_p95": 184.5314261940075,
+        "corner_error_px": 167.7856854943935
+      },
+      "theseus": {
+        "time_ms_median": 560.4778519918909,
+        "time_ms_p95": 647.3273167939624,
+        "corner_error_px": 233.84316519780475
+      },
+      "ransac_init": {
+        "corner_error_px": 246.55165339027195
+      },
+      "H_diff_frobenius": 2.1664191897013256
+    }
+  ]
+}
