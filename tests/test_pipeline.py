@@ -256,6 +256,91 @@ class TestPipelineBatched(unittest.TestCase):
         # n_iters must equal first dim of cost.
         self.assertEqual(hist.n_iters, hist.cost.shape[0])
 
+    def test_return_result_dataclass_forward_compat(self):
+        """Caller using only res.H_init + res.history today must get the
+        SAME dataclass tomorrow when they additionally read res.H."""
+        import torch
+        from ransac_multimodel.pipeline import (
+            BatchedHomographyResult, estimate_homography_batched,
+        )
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        # "Today" usage: only need H_init + history.
+        res = estimate_homography_batched(
+            stacked, backend="torch_cpu",
+            return_result=True, refine=True, track_history=True,
+        )
+        self.assertIsInstance(res, BatchedHomographyResult)
+        self.assertEqual(res.H_init.shape, (len(items), 3, 3))
+        self.assertEqual(res.H.shape, (len(items), 3, 3))
+        self.assertIsNotNone(res.history)
+        self.assertEqual(res.history.cost.shape[1], len(items))
+        self.assertIsNone(res.per_frame)
+
+        # H must differ from H_init (LM did something on real samples).
+        diff = float(np.linalg.norm(res.H - res.H_init))
+        self.assertGreater(diff, 1e-3,
+                           msg=f"H == H_init (LM no-op?), ||dH||={diff}")
+
+    def test_return_result_with_refine_false(self):
+        """When refine=False, res.H must equal res.H_init and history is None."""
+        import torch
+        from ransac_multimodel.pipeline import estimate_homography_batched
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        res = estimate_homography_batched(
+            stacked, backend="torch_cpu",
+            return_result=True, refine=False,
+        )
+        self.assertTrue(np.allclose(res.H, res.H_init),
+                        "refine=False must leave H == H_init")
+        self.assertIsNone(res.history)
+
+    def test_cli_resolver_helpers(self):
+        """Public BACKENDS/RANSAC_METHODS + resolve_* helpers usable from a CLI."""
+        import torch as _torch
+        from ransac_multimodel import (
+            BACKENDS, DEFAULT_BACKEND, DEFAULT_BATCHED_BACKEND,
+            RANSAC_METHODS, DEFAULT_RANSAC_METHOD_NAME,
+            estimate_homography, estimate_homography_batched,
+            resolve_backend, resolve_ransac_method,
+        )
+        # Constants are non-empty.
+        self.assertIn("numpy", BACKENDS)
+        self.assertIn("torch_cpu", BACKENDS)
+        self.assertIn("torch_cuda", BACKENDS)
+        self.assertIn(DEFAULT_BACKEND, BACKENDS)
+        self.assertIn(DEFAULT_BATCHED_BACKEND, BACKENDS)
+        self.assertIn(DEFAULT_RANSAC_METHOD_NAME, RANSAC_METHODS)
+
+        # resolve_backend("auto") picks something valid.
+        chosen = resolve_backend("auto")
+        self.assertIn(chosen, BACKENDS)
+        # Explicit names round-trip.
+        self.assertEqual(resolve_backend("torch_cpu"), "torch_cpu")
+        # Bad name raises clearly.
+        with self.assertRaises(ValueError):
+            resolve_backend("turbo_engine")
+
+        # resolve_ransac_method round-trips.
+        self.assertIsInstance(resolve_ransac_method("usac_fast"), int)
+        with self.assertRaises(ValueError):
+            resolve_ransac_method("nope")
+
+        # End-to-end CLI-like wiring on real data.
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = _torch.stack(items, dim=0)
+        H = estimate_homography_batched(
+            stacked,
+            backend=resolve_backend("auto"),
+            ransac_method=resolve_ransac_method("usac_fast"),
+        )
+        self.assertEqual(H.shape, (len(items), 3, 3))
+
     def test_logger_callback_fires_per_iter(self):
         """logger=callable must be invoked once per LM iter with the right shapes."""
         import torch
