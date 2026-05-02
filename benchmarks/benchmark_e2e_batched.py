@@ -55,6 +55,7 @@ from ransac_multimodel.correspondence_torch import (  # noqa: E402
 )
 from ransac_multimodel.homography import optimize_homography  # noqa: E402
 from ransac_multimodel.homography_torch_lm import (  # noqa: E402
+    pad_for_batched_lm,
     refine_homography_torch_lm_torch,
 )
 
@@ -170,54 +171,41 @@ def pipeline_torch_seq(items: List[torch.Tensor], device: str) -> List[np.ndarra
 def pipeline_torch_batched(
     stacked: torch.Tensor, device: str, mode: str
 ) -> List[np.ndarray]:
-    """Batched extraction (one CUDA call) + RANSAC loop + LM (batched if same N)."""
+    """Batched extraction + RANSAC loop + LM via the public pipeline API.
+
+    Now goes through ``estimate_homography_batched`` so this benchmark stays
+    in sync with what the public API actually does (GPU-resident extraction
+    output, only pts_A + peaks_B cross the host boundary for cv2 RANSAC).
+    """
+    from ransac_multimodel.pipeline import estimate_homography_batched
+    H = estimate_homography_batched(
+        stacked, backend=f"torch_{device}",
+        ransac_method=DEFAULT_RANSAC, model="sRT",
+    )
+    return [H[i] for i in range(H.shape[0])]
+
+
+def _pipeline_torch_batched_legacy(
+    stacked: torch.Tensor, device: str, mode: str
+) -> List[np.ndarray]:
+    """Legacy host-round-trip path; kept around to make the GPU-resident
+    optimization measurable. Not on the default path."""
     stacked_dev = stacked.to(device, non_blocking=True)
     per_frame = find_gaussians_torch_batch(stacked_dev, device=device)
-
-    # RANSAC must run sequentially on CPU (cv2 has no batched API).
     H_inits = []
     for pts_A, _means_B, peaks_B, _covs_B in per_frame:
         if pts_A.shape[0] < 4:
             H_inits.append(np.eye(3))
         else:
             H_inits.append(_ransac_init_one(pts_A, peaks_B))
-
-    # Refinement: batched if all frames share the same N, else loop.
-    Ns = [t[0].shape[0] for t in per_frame]
-    if mode == "homogeneous" and len(set(Ns)) == 1 and Ns[0] >= 4:
-        N = Ns[0]
-        pts_A = torch.from_numpy(
-            np.stack([t[0] for t in per_frame]).astype(np.float64)
-        ).to(device)
-        means_B = torch.from_numpy(
-            np.stack([t[1] for t in per_frame]).astype(np.float64)
-        ).to(device)
-        covs_B = torch.from_numpy(
-            np.stack([t[3] for t in per_frame]).astype(np.float64)
-        ).to(device)
-        H_init_t = torch.from_numpy(np.stack(H_inits).astype(np.float64)).to(device)
-        with torch.no_grad():
-            H_opt = refine_homography_torch_lm_torch(
-                pts_A, means_B, covs_B, H_init_t, model="sRT",
-            )
-        return [H_opt[i].detach().cpu().numpy() for i in range(len(per_frame))]
-
-    # Heterogeneous (or any frame too small): loop the LM step.
-    out = []
-    for (pts_A, means_B, peaks_B, covs_B), H_init in zip(per_frame, H_inits):
-        if pts_A.shape[0] < 4:
-            out.append(np.eye(3))
-            continue
-        pts_A_t = torch.from_numpy(pts_A.astype(np.float64)).to(device)
-        means_B_t = torch.from_numpy(means_B.astype(np.float64)).to(device)
-        covs_B_t = torch.from_numpy(covs_B.astype(np.float64)).to(device)
-        H_init_t = torch.from_numpy(H_init.astype(np.float64)).to(device)
-        with torch.no_grad():
-            H_opt = refine_homography_torch_lm_torch(
-                pts_A_t, means_B_t, covs_B_t, H_init_t, model="sRT",
-            )
-        out.append(H_opt[0].detach().cpu().numpy())
-    return out
+    pts_A, means_B, covs_B, H_init_t, mask = pad_for_batched_lm(
+        per_frame, H_inits, device=device, dtype=torch.float64,
+    )
+    with torch.no_grad():
+        H_opt = refine_homography_torch_lm_torch(
+            pts_A, means_B, covs_B, H_init_t, mask=mask, model="sRT",
+        )
+    return [H_opt[i].detach().cpu().numpy() for i in range(len(per_frame))]
 
 
 # --------------------------------------------------------------------------- #
