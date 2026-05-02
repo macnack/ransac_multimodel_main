@@ -173,6 +173,62 @@ class TestTorchLMParity(unittest.TestCase):
         H_opt = refine_homography_torch_lm_torch(pts_A, means_B, covs_B, H_init, model="sRT")
         self.assertEqual(H_opt.shape, (B, 3, 3))
 
+    def test_padded_masked_matches_per_frame(self):
+        """pad_for_batched_lm + masked LM must match per-frame results."""
+        import cv2
+        import torch
+        import numpy as np
+
+        from ransac_multimodel.correspondence import find_gaussians
+        from ransac_multimodel.homography_torch_lm import (
+            pad_for_batched_lm,
+            refine_homography_torch_lm_torch,
+        )
+
+        sids = [98, 122, 128]
+        per_frame = []
+        H_inits = []
+        for sid in sids:
+            sample = torch.load(
+                os.path.join(_REPO_ROOT, "tensors", f"sample_{sid:03d}_tensor.pt"),
+                map_location="cpu",
+            )
+            logits = sample[16]["gm_cls"][0]
+            out = find_gaussians(
+                logits, adaptive_gauss_fit=False, log_missing_gaussians=False,
+            )
+            per_frame.append(out)
+            pts_A, _, peaks_B, _ = out
+            H, _ = cv2.findHomography(pts_A, peaks_B, cv2.USAC_FAST, maxIters=5000)
+            H_inits.append(H / H[2, 2])
+
+        # Per-frame baseline
+        per_frame_results = []
+        for (pts_A, means_B, _peaks_B, covs_B), H_init in zip(per_frame, H_inits):
+            pts = torch.from_numpy(pts_A.astype(np.float64))
+            mu = torch.from_numpy(means_B.astype(np.float64))
+            cov = torch.from_numpy(covs_B.astype(np.float64))
+            Hi = torch.from_numpy(H_init)
+            H = refine_homography_torch_lm_torch(pts, mu, cov, Hi, model="sRT")
+            per_frame_results.append(H[0].numpy())
+
+        # Padded batched
+        pts_A_b, means_B_b, covs_B_b, H_init_b, mask = pad_for_batched_lm(
+            per_frame, H_inits, device="cpu", dtype=torch.float64,
+        )
+        H_batched = refine_homography_torch_lm_torch(
+            pts_A_b, means_B_b, covs_B_b, H_init_b, mask=mask, model="sRT",
+        )
+
+        for i, (h_seq, h_bat) in enumerate(zip(per_frame_results, H_batched.numpy())):
+            with self.subTest(frame=i):
+                # Bit-identical because masked LM does the same arithmetic
+                # restricted to the unpadded slots.
+                self.assertLess(
+                    float(np.linalg.norm(h_seq - h_bat)), 1e-6,
+                    msg=f"frame {i}: ||H_seq - H_bat||_F = {np.linalg.norm(h_seq - h_bat):.6f}",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

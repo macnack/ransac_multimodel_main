@@ -55,6 +55,7 @@ from ransac_multimodel.correspondence_torch import (  # noqa: E402
 )
 from ransac_multimodel.homography import optimize_homography  # noqa: E402
 from ransac_multimodel.homography_torch_lm import (  # noqa: E402
+    pad_for_batched_lm,
     refine_homography_torch_lm_torch,
 )
 
@@ -182,42 +183,17 @@ def pipeline_torch_batched(
         else:
             H_inits.append(_ransac_init_one(pts_A, peaks_B))
 
-    # Refinement: batched if all frames share the same N, else loop.
-    Ns = [t[0].shape[0] for t in per_frame]
-    if mode == "homogeneous" and len(set(Ns)) == 1 and Ns[0] >= 4:
-        N = Ns[0]
-        pts_A = torch.from_numpy(
-            np.stack([t[0] for t in per_frame]).astype(np.float64)
-        ).to(device)
-        means_B = torch.from_numpy(
-            np.stack([t[1] for t in per_frame]).astype(np.float64)
-        ).to(device)
-        covs_B = torch.from_numpy(
-            np.stack([t[3] for t in per_frame]).astype(np.float64)
-        ).to(device)
-        H_init_t = torch.from_numpy(np.stack(H_inits).astype(np.float64)).to(device)
-        with torch.no_grad():
-            H_opt = refine_homography_torch_lm_torch(
-                pts_A, means_B, covs_B, H_init_t, model="sRT",
-            )
-        return [H_opt[i].detach().cpu().numpy() for i in range(len(per_frame))]
-
-    # Heterogeneous (or any frame too small): loop the LM step.
-    out = []
-    for (pts_A, means_B, peaks_B, covs_B), H_init in zip(per_frame, H_inits):
-        if pts_A.shape[0] < 4:
-            out.append(np.eye(3))
-            continue
-        pts_A_t = torch.from_numpy(pts_A.astype(np.float64)).to(device)
-        means_B_t = torch.from_numpy(means_B.astype(np.float64)).to(device)
-        covs_B_t = torch.from_numpy(covs_B.astype(np.float64)).to(device)
-        H_init_t = torch.from_numpy(H_init.astype(np.float64)).to(device)
-        with torch.no_grad():
-            H_opt = refine_homography_torch_lm_torch(
-                pts_A_t, means_B_t, covs_B_t, H_init_t, model="sRT",
-            )
-        out.append(H_opt[0].detach().cpu().numpy())
-    return out
+    # Refinement: pad+mask so the batched LM works regardless of variable N.
+    # Frames with N < 4 keep their H_init (the LM cost is constant for them
+    # under the all-zero mask).
+    pts_A, means_B, covs_B, H_init_t, mask = pad_for_batched_lm(
+        per_frame, H_inits, device=device, dtype=torch.float64,
+    )
+    with torch.no_grad():
+        H_opt = refine_homography_torch_lm_torch(
+            pts_A, means_B, covs_B, H_init_t, mask=mask, model="sRT",
+        )
+    return [H_opt[i].detach().cpu().numpy() for i in range(len(per_frame))]
 
 
 # --------------------------------------------------------------------------- #
