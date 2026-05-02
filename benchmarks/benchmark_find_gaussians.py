@@ -251,7 +251,12 @@ def _print_table(rows: List[Dict[str, Any]], have_cuda: bool) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dataset-dir", default="./tensors")
+    ap.add_argument(
+        "--dataset-dir",
+        default=os.path.join(_REPO_ROOT, "tensors"),
+        help="Path to the .pt tensor directory; defaults to <repo>/tensors so "
+             "the script works regardless of CWD.",
+    )
     ap.add_argument(
         "--sample-ids",
         default="98,122,128",

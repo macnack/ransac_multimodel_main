@@ -1,0 +1,56 @@
+{
+  "sample_id": 128,
+  "rows": [
+    {
+      "batch_size": 1,
+      "n_points": 196,
+      "model": "sRT",
+      "device": "cuda",
+      "scipy_loop_ms_median": 72.05709000118077,
+      "scipy_loop_ms_p95": 75.26687520148698,
+      "theseus_batch_ms_median": 272.86119799828157,
+      "theseus_batch_ms_p95": 295.86559489944193,
+      "torch_lm_batch_ms_median": 16.05922599992482,
+      "torch_lm_batch_ms_p95": 16.305634301534155,
+      "scipy_per_item_ms": 72.05709000118077,
+      "theseus_per_item_ms": 272.86119799828157,
+      "torch_lm_per_item_ms": 16.05922599992482,
+      "speedup_theseus_over_scipy": 0.26407965122851423,
+      "speedup_torch_lm_over_scipy": 4.486959085171234
+    },
+    {
+      "batch_size": 16,
+      "n_points": 196,
+      "model": "sRT",
+      "device": "cuda",
+      "scipy_loop_ms_median": 1180.1826510018145,
+      "scipy_loop_ms_p95": 1219.0361405973817,
+      "theseus_batch_ms_median": 598.3723730023485,
+      "theseus_batch_ms_p95": 636.4998217981338,
+      "torch_lm_batch_ms_median": 16.745502001867862,
+      "torch_lm_batch_ms_p95": 18.245571601437405,
+      "scipy_per_item_ms": 73.76141568761341,
+      "theseus_per_item_ms": 37.39827331264678,
+      "torch_lm_per_item_ms": 1.0465938751167414,
+      "speedup_theseus_over_scipy": 1.9723214243335105,
+      "speedup_torch_lm_over_scipy": 70.47759158669427
+    },
+    {
+      "batch_size": 64,
+      "n_points": 196,
+      "model": "sRT",
+      "device": "cuda",
+      "scipy_loop_ms_median": 4836.688354000216,
+      "scipy_loop_ms_p95": 4943.2842297992465,
+      "theseus_batch_ms_median": 1944.6606839992455,
+      "theseus_batch_ms_p95": 1946.3111669985665,
+      "torch_lm_batch_ms_median": 20.567754003423033,
+      "torch_lm_batch_ms_p95": 21.430510198842967,
+      "scipy_per_item_ms": 75.57325553125338,
+      "theseus_per_item_ms": 30.38532318748821,
+      "torch_lm_per_item_ms": 0.3213711563034849,
+      "speedup_theseus_over_scipy": 2.4871631302040007,
+      "speedup_torch_lm_over_scipy": 235.15880018767533
+    }
+  ]
+}
