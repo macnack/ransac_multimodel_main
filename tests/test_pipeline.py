@@ -124,6 +124,112 @@ class TestPipelineBatched(unittest.TestCase):
                     msg=f"frame {i}: ||dH||_F = {np.linalg.norm(h_seq - h_bat):.6f}",
                 )
 
+    def test_sparse_frame_keeps_H_init_in_batched(self):
+        """[P1 fix] A frame with N<4 in a batch must NOT be optimized; it
+        must keep its RANSAC fallback. Tests pad_for_batched_lm directly."""
+        import torch
+        from ransac_multimodel.homography_torch_lm import (
+            pad_for_batched_lm,
+            refine_homography_torch_lm_torch,
+        )
+
+        # Build per_frame manually: frame 0 has 50 real correspondences,
+        # frame 1 has only 2 (sparse, can't constrain a homography), frame 2
+        # has 30. We don't go through extraction — we test the pad helper +
+        # LM directly with a known sparse frame.
+        rng = np.random.default_rng(42)
+
+        def _gen_frame(n: int):
+            pts_A = rng.uniform(0, 14, size=(n, 2)).astype(np.float32)
+            means_B = (pts_A * 4 + rng.normal(0, 0.1, size=(n, 2))).astype(np.float32)
+            peaks_B = means_B.copy()
+            covs_B = np.tile(np.eye(2, dtype=np.float32) * 0.5, (n, 1, 1))
+            return pts_A, means_B, peaks_B, covs_B
+
+        per_frame = [_gen_frame(50), _gen_frame(2), _gen_frame(30)]
+        # H_init for the sparse frame is a non-identity sRT — we'll check
+        # the LM leaves it untouched.
+        H_init_sparse = np.array(
+            [[1.5, 0.1, 2.0], [0.1, 1.5, -3.0], [0.0, 0.0, 1.0]],
+            dtype=np.float64,
+        )
+        H_inits = [
+            np.eye(3, dtype=np.float64),
+            H_init_sparse,
+            np.eye(3, dtype=np.float64),
+        ]
+
+        pts_A, means_B, covs_B, H_init_t, mask = pad_for_batched_lm(
+            per_frame, H_inits, device="cpu", dtype=torch.float64,
+        )
+
+        # P1 contract: frame 1 mask must be all zero (N=2 < 4).
+        self.assertEqual(float(mask[1].sum()), 0.0,
+                         "sparse frame (N<4) mask must be all-zero")
+        # Sanity: frames with enough N must have non-zero mask.
+        self.assertEqual(float(mask[0].sum()), 50.0)
+        self.assertEqual(float(mask[2].sum()), 30.0)
+
+        # Use model="full" so H_init params round-trip exactly through the
+        # 8-element flatten (sRT extraction discards non-anti-symmetric
+        # components and would change a non-sRT H_init via projection).
+        H_opt = refine_homography_torch_lm_torch(
+            pts_A, means_B, covs_B, H_init_t, mask=mask, model="full",
+        )
+        # Sparse frame must come out identical to its H_init.
+        delta = float(np.linalg.norm(H_opt[1].numpy() - H_init_sparse))
+        self.assertLess(delta, 1e-6,
+                        msg=f"sparse frame got optimized: ||dH||={delta:.6f}")
+
+    def test_return_per_frame_yields_B_tuples_when_all_empty(self):
+        """[P3 fix] return_per_frame must always yield exactly B tuples,
+        including the all-frames-empty short-circuit."""
+        import torch
+        from ransac_multimodel.pipeline import estimate_homography_batched
+
+        # All-uniform logits → softmax is uniform → no peak above threshold.
+        # Use 14x14 grid with 4096 (=64²) M dimension for shape sanity.
+        B = 4
+        empty_batch = torch.zeros((B, 4096, 14, 14), dtype=torch.float32)
+
+        H, per_frame = estimate_homography_batched(
+            empty_batch, backend="torch_cpu", return_per_frame=True,
+        )
+        self.assertEqual(H.shape, (B, 3, 3))
+        self.assertEqual(len(per_frame), B,
+                         msg=f"return_per_frame returned {len(per_frame)} tuples for B={B}")
+        for i, (pts, mu, peaks, cov) in enumerate(per_frame):
+            with self.subTest(frame=i):
+                self.assertEqual(pts.shape, (0, 2))
+                self.assertEqual(cov.shape, (0, 2, 2))
+
+    def test_refine_false_returns_ransac_init(self):
+        """refine=False must skip the LM and return the RANSAC init H."""
+        import torch
+        from ransac_multimodel.pipeline import estimate_homography, estimate_homography_batched
+
+        logits = _load_logits(128)
+
+        # Single
+        H_no_refine = estimate_homography(logits, backend="numpy", refine=False, return_details=True)
+        # H equals H_init by construction.
+        self.assertTrue(np.allclose(H_no_refine.H, H_no_refine.H_init))
+
+        # Batched
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+        H_batch_no_refine = estimate_homography_batched(
+            stacked, backend="torch_cpu", refine=False,
+        )
+        H_batch_refine = estimate_homography_batched(
+            stacked, backend="torch_cpu", refine=True,
+        )
+        # The two must differ (LM did something) — otherwise refine=False
+        # is a no-op and the test is uninformative.
+        delta = float(np.linalg.norm(H_batch_no_refine - H_batch_refine))
+        self.assertGreater(delta, 1e-3,
+                           msg=f"refine=True/False produced ~identical H (||dH||={delta})")
+
     def test_batched_cuda_matches_cpu_within_float_noise(self):
         import torch
         if not torch.cuda.is_available():
