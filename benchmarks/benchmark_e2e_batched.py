@@ -171,21 +171,33 @@ def pipeline_torch_seq(items: List[torch.Tensor], device: str) -> List[np.ndarra
 def pipeline_torch_batched(
     stacked: torch.Tensor, device: str, mode: str
 ) -> List[np.ndarray]:
-    """Batched extraction (one CUDA call) + RANSAC loop + LM (batched if same N)."""
+    """Batched extraction + RANSAC loop + LM via the public pipeline API.
+
+    Now goes through ``estimate_homography_batched`` so this benchmark stays
+    in sync with what the public API actually does (GPU-resident extraction
+    output, only pts_A + peaks_B cross the host boundary for cv2 RANSAC).
+    """
+    from ransac_multimodel.pipeline import estimate_homography_batched
+    H = estimate_homography_batched(
+        stacked, backend=f"torch_{device}",
+        ransac_method=DEFAULT_RANSAC, model="sRT",
+    )
+    return [H[i] for i in range(H.shape[0])]
+
+
+def _pipeline_torch_batched_legacy(
+    stacked: torch.Tensor, device: str, mode: str
+) -> List[np.ndarray]:
+    """Legacy host-round-trip path; kept around to make the GPU-resident
+    optimization measurable. Not on the default path."""
     stacked_dev = stacked.to(device, non_blocking=True)
     per_frame = find_gaussians_torch_batch(stacked_dev, device=device)
-
-    # RANSAC must run sequentially on CPU (cv2 has no batched API).
     H_inits = []
     for pts_A, _means_B, peaks_B, _covs_B in per_frame:
         if pts_A.shape[0] < 4:
             H_inits.append(np.eye(3))
         else:
             H_inits.append(_ransac_init_one(pts_A, peaks_B))
-
-    # Refinement: pad+mask so the batched LM works regardless of variable N.
-    # Frames with N < 4 keep their H_init (the LM cost is constant for them
-    # under the all-zero mask).
     pts_A, means_B, covs_B, H_init_t, mask = pad_for_batched_lm(
         per_frame, H_inits, device=device, dtype=torch.float64,
     )
