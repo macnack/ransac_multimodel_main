@@ -1,0 +1,61 @@
+{
+  "mode": "heterogeneous",
+  "rows": [
+    {
+      "batch_size": 1,
+      "mode": "heterogeneous",
+      "np_seq_ms_median": 49.94637799973134,
+      "np_seq_ms_p95": 50.45065519880154,
+      "torch_seq_cpu_ms_median": 38.121964997117175,
+      "torch_seq_cpu_ms_p95": 41.675399901214405,
+      "torch_seq_cuda_ms_median": 19.24373200017726,
+      "torch_seq_cuda_ms_p95": 19.538679100878653,
+      "torch_batched_ms_median": 19.534782000846462,
+      "torch_batched_ms_p95": 21.07279649899283,
+      "speedup_batched_vs_numpy": 2.5567921872671584,
+      "speedup_batched_vs_seq_cuda": 0.9851009342895871
+    },
+    {
+      "batch_size": 4,
+      "mode": "heterogeneous",
+      "np_seq_ms_median": 228.31781200147816,
+      "np_seq_ms_p95": 230.87412610111642,
+      "torch_seq_cpu_ms_median": 141.18259899987606,
+      "torch_seq_cpu_ms_p95": 142.73673609859543,
+      "torch_seq_cuda_ms_median": 83.36444700034917,
+      "torch_seq_cuda_ms_p95": 84.04616010193422,
+      "torch_batched_ms_median": 70.21487400197657,
+      "torch_batched_ms_p95": 98.37887099965883,
+      "speedup_batched_vs_numpy": 3.251701512631796,
+      "speedup_batched_vs_seq_cuda": 1.1872761745325136
+    },
+    {
+      "batch_size": 16,
+      "mode": "heterogeneous",
+      "np_seq_ms_median": 876.5150680010265,
+      "np_seq_ms_p95": 898.4608768023463,
+      "torch_seq_cpu_ms_median": 515.7537980012421,
+      "torch_seq_cpu_ms_p95": 515.8756183980586,
+      "torch_seq_cuda_ms_median": 349.23538099974394,
+      "torch_seq_cuda_ms_p95": 358.4538442999474,
+      "torch_batched_ms_median": 278.4449609971489,
+      "torch_batched_ms_p95": 285.2607150005497,
+      "speedup_batched_vs_numpy": 3.147893446741173,
+      "speedup_batched_vs_seq_cuda": 1.254234875535492
+    },
+    {
+      "batch_size": 64,
+      "mode": "heterogeneous",
+      "np_seq_ms_median": 3644.0225220030698,
+      "np_seq_ms_p95": 3682.8411591017357,
+      "torch_seq_cpu_ms_median": 1718.929858001502,
+      "torch_seq_cpu_ms_p95": 1743.2147893025103,
+      "torch_seq_cuda_ms_median": 1280.7743570010643,
+      "torch_seq_cuda_ms_p95": 1285.9318358016026,
+      "torch_batched_ms_median": 1142.1208589999878,
+      "torch_batched_ms_p95": 1173.942302101932,
+      "speedup_batched_vs_numpy": 3.1905752296597436,
+      "speedup_batched_vs_seq_cuda": 1.1214000225181755
+    }
+  ]
+}

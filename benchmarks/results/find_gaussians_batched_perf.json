@@ -1,0 +1,30 @@
+{
+  "1": {
+    "numpy_loop_ms": 12.492819998442428,
+    "torch_seq_cpu_ms": 20.120429999224143,
+    "torch_batch_cpu_ms": 18.04804999846965,
+    "torch_seq_cuda_ms": 2.755759000137914,
+    "torch_batch_cuda_ms": 2.793470001051901
+  },
+  "4": {
+    "numpy_loop_ms": 25.726345997099997,
+    "torch_seq_cpu_ms": 68.08362800074974,
+    "torch_batch_cpu_ms": 53.89476799973636,
+    "torch_seq_cuda_ms": 10.897049000050174,
+    "torch_batch_cuda_ms": 3.9041359996190295
+  },
+  "16": {
+    "numpy_loop_ms": 105.3168819998973,
+    "torch_seq_cpu_ms": 240.60253399875364,
+    "torch_batch_cpu_ms": 178.91938200045843,
+    "torch_seq_cuda_ms": 43.060920001153136,
+    "torch_batch_cuda_ms": 13.092089000565466
+  },
+  "64": {
+    "numpy_loop_ms": 419.4492189999437,
+    "torch_seq_cpu_ms": 764.6362930026953,
+    "torch_batch_cpu_ms": 677.0888659993943,
+    "torch_seq_cuda_ms": 173.08458400293603,
+    "torch_batch_cuda_ms": 36.650746002123924
+  }
+}

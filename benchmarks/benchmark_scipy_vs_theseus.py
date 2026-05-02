@@ -216,7 +216,12 @@ def _print_table(rows: List[Dict[str, Any]]) -> None:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dataset-dir", default="./tensors")
+    ap.add_argument(
+        "--dataset-dir",
+        default=os.path.join(_REPO_ROOT, "tensors"),
+        help="Path to .pt tensor dir; defaults to <repo>/tensors so the script "
+             "works regardless of CWD.",
+    )
     ap.add_argument(
         "--sample-ids",
         default="98,122,128",

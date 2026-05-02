@@ -77,7 +77,12 @@ def _ransac_init_np(pts_A, peaks_B, means_B, use_means: bool = False):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dataset-dir", default="./tensors")
+    ap.add_argument(
+        "--dataset-dir",
+        default=os.path.join(_REPO_ROOT, "tensors"),
+        help="Path to .pt tensor dir; defaults to <repo>/tensors so the script "
+             "works regardless of CWD.",
+    )
     ap.add_argument("--sample-id", type=int, default=128, help="real sample whose correspondences to replicate")
     ap.add_argument("--batch-sizes", default="1,4,16,64")
     ap.add_argument("--model", choices=["sRT", "full"], default="sRT")

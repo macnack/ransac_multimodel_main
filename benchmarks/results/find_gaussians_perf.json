@@ -1,0 +1,37 @@
+{
+  "repeats": 5,
+  "warmup": 2,
+  "device": "cuda",
+  "samples": {
+    "98": {
+      "n_corresp_np": 209,
+      "n_corresp_torch": 209,
+      "numpy_ms_median": 7.102458999725059,
+      "numpy_ms_p95": 7.554696600709576,
+      "torch_cpu_ms_median": 16.51967500220053,
+      "torch_cpu_ms_p95": 19.921010600955924,
+      "torch_cuda_ms_median": 2.909088998421794,
+      "torch_cuda_ms_p95": 2.965172600670485
+    },
+    "122": {
+      "n_corresp_np": 114,
+      "n_corresp_torch": 113,
+      "numpy_ms_median": 5.901913998968666,
+      "numpy_ms_p95": 6.038496000110172,
+      "torch_cpu_ms_median": 16.030232000048272,
+      "torch_cpu_ms_p95": 20.072419400094077,
+      "torch_cuda_ms_median": 2.921932999015553,
+      "torch_cuda_ms_p95": 2.946454400080256
+    },
+    "128": {
+      "n_corresp_np": 196,
+      "n_corresp_torch": 196,
+      "numpy_ms_median": 7.050961998174898,
+      "numpy_ms_p95": 7.53576700008125,
+      "torch_cpu_ms_median": 15.505542000028072,
+      "torch_cpu_ms_p95": 18.360511999344453,
+      "torch_cuda_ms_median": 2.9205690007074736,
+      "torch_cuda_ms_p95": 2.958246798516484
+    }
+  }
+}
