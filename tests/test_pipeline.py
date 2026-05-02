@@ -230,6 +230,57 @@ class TestPipelineBatched(unittest.TestCase):
         self.assertGreater(delta, 1e-3,
                            msg=f"refine=True/False produced ~identical H (||dH||={delta})")
 
+    def test_track_history_returns_LMHistory(self):
+        """track_history=True must surface per-iter cost / damping / accept."""
+        import torch
+        from ransac_multimodel.homography_torch_lm import LMHistory
+        from ransac_multimodel.pipeline import estimate_homography_batched
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        H, hist = estimate_homography_batched(
+            stacked, backend="torch_cpu", track_history=True,
+        )
+        self.assertIsInstance(hist, LMHistory)
+        self.assertEqual(H.shape, (len(items), 3, 3))
+        self.assertEqual(hist.cost.shape[1], len(items))
+        self.assertEqual(hist.damping.shape, hist.cost.shape)
+        self.assertEqual(hist.accept.shape, hist.cost.shape)
+        self.assertEqual(hist.final_cost.shape, (len(items),))
+        self.assertEqual(hist.converged.shape, (len(items),))
+        # Cost should be monotone-ish (LM only accepts steps that decrease it
+        # so per-batch-element series should be non-increasing modulo rejected
+        # iters). Final cost must be finite.
+        self.assertTrue(bool(torch.isfinite(hist.final_cost).all()))
+        # n_iters must equal first dim of cost.
+        self.assertEqual(hist.n_iters, hist.cost.shape[0])
+
+    def test_logger_callback_fires_per_iter(self):
+        """logger=callable must be invoked once per LM iter with the right shapes."""
+        import torch
+        from ransac_multimodel.pipeline import estimate_homography_batched
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        events = []
+        def _logger(it, cost, damping, accept):
+            events.append((it, tuple(cost.shape), tuple(damping.shape), tuple(accept.shape), accept.dtype))
+
+        estimate_homography_batched(stacked, backend="torch_cpu", logger=_logger)
+
+        self.assertGreater(len(events), 0)
+        # Iter indices must be 0..n-1 contiguous.
+        iters = [e[0] for e in events]
+        self.assertEqual(iters, list(range(len(events))))
+        # Each event must have (B,) cost / damping and (B,) bool accept.
+        for it, c_shape, d_shape, a_shape, a_dtype in events:
+            self.assertEqual(c_shape, (len(items),))
+            self.assertEqual(d_shape, (len(items),))
+            self.assertEqual(a_shape, (len(items),))
+            self.assertEqual(a_dtype, torch.bool)
+
     def test_batched_cuda_matches_cpu_within_float_noise(self):
         import torch
         if not torch.cuda.is_available():
