@@ -410,9 +410,20 @@ def evaluate_config(
     geom: dict[str, Any] | None = None,
     track_history: bool = False,
     seed: int = 0,
+    batch_size: int = -1,
 ) -> dict[str, Any]:
     """Run one config across all samples, return the per-sample records and
     aggregated metrics + the optional LMHistory.
+
+    Args:
+        samples: List of SampleData.
+        lm_kwargs: LM hyperparameter dict.
+        backend: Torch device (default: auto-detect).
+        geom: Geometry dict (default: DEFAULT_GEOMETRY).
+        track_history: Whether to track LMHistory.
+        seed: Random seed for reproducibility.
+        batch_size: Batch size for iterative evaluation. Default -1 = evaluate all at once.
+                    If > 0, samples are evaluated in chunks of batch_size.
 
     Returns dict::
 
@@ -436,84 +447,109 @@ def evaluate_config(
     geom = geom or DEFAULT_GEOMETRY
     backend = backend or _resolve_device(prefer_cuda=True)
 
-    stacked = torch.stack([s.logits for s in samples], dim=0)
+    # Determine batch size for evaluation: -1 (default) = all at once, >0 = chunk size
+    eval_batch_size = len(samples) if batch_size <= 0 else batch_size
 
-    # estimate_homography_batched takes ``f_scale`` and ``max_iter`` as
-    # EXPLICIT kwargs (they pre-date lm_kwargs). When the sweep config
-    # carries them in ``lm_kwargs`` we have to split them out — otherwise
-    # the splat collides with the explicit arg and Python raises
-    # "multiple values for keyword argument".
-    lm_kwargs_local = dict(lm_kwargs)  # copy — caller may reuse the dict
-    f_scale = lm_kwargs_local.pop("f_scale", 2.0)
-    max_iter = lm_kwargs_local.pop("max_iter", 100)
-    model = lm_kwargs_local.pop("model", "sRT")
-
+    # Process samples in chunks
+    per_sample_all: list[dict[str, Any]] = []
+    history_all = None
     t0 = time.perf_counter()
-    res = estimate_homography_batched(
-        stacked, backend=backend,
-        model=model,
-        refine=True,
-        f_scale=float(f_scale),
-        max_iter=int(max_iter),
-        lm_kwargs=lm_kwargs_local,
-        track_history=track_history,
-        return_result=True,
-        return_per_frame=True,
-    )
+
+    for chunk_start in range(0, len(samples), eval_batch_size):
+        chunk_end = min(chunk_start + eval_batch_size, len(samples))
+        chunk_samples = samples[chunk_start:chunk_end]
+        stacked = torch.stack([s.logits for s in chunk_samples], dim=0)
+
+        # estimate_homography_batched takes ``f_scale`` and ``max_iter`` as
+        # EXPLICIT kwargs (they pre-date lm_kwargs). When the sweep config
+        # carries them in ``lm_kwargs`` we have to split them out — otherwise
+        # the splat collides with the explicit arg and Python raises
+        # "multiple values for keyword argument".
+        lm_kwargs_local = dict(lm_kwargs)  # copy — caller may reuse the dict
+        f_scale = lm_kwargs_local.pop("f_scale", 2.0)
+        max_iter = lm_kwargs_local.pop("max_iter", 100)
+        model = lm_kwargs_local.pop("model", "sRT")
+
+        res = estimate_homography_batched(
+            stacked, backend=backend,
+            model=model,
+            refine=True,
+            f_scale=float(f_scale),
+            max_iter=int(max_iter),
+            lm_kwargs=lm_kwargs_local,
+            track_history=track_history,
+            return_result=True,
+            return_per_frame=True,
+        )
+
+        per_sample: list[dict[str, Any]] = []
+        ce_inits: list[float] = []
+        ce_refineds: list[float] = []
+        for b, s in enumerate(chunk_samples):
+            H_init = res.H_init[b]
+            H_ref = res.H[b]
+            ce_init = _corner_error_safe(H_init, s.H_gt_pix, geom)
+            ce_ref = _corner_error_safe(H_ref, s.H_gt_pix, geom)
+            n_corr = int(res.per_frame[b][0].shape[0]) if res.per_frame is not None else -1
+            try:
+                det_init = float(np.linalg.det(H_init))
+            except Exception:
+                det_init = float("nan")
+            try:
+                det_ref = float(np.linalg.det(H_ref))
+            except Exception:
+                det_ref = float("nan")
+            try:
+                h_diff = float(np.linalg.norm(H_ref - H_init))
+            except Exception:
+                h_diff = float("nan")
+            rec: dict[str, Any] = {
+                "sample_id":     s.sample_id,
+                "n_corr":        n_corr,
+                "ce_init_px":    ce_init,
+                "ce_refined_px": ce_ref,
+                "dce_px":        (ce_init - ce_ref) if (_is_finite(ce_init) and _is_finite(ce_ref)) else float("nan"),
+                "H_init_det":    det_init,
+                "H_refined_det": det_ref,
+                "H_diff_fro":    h_diff,
+            }
+            if track_history and res.history is not None:
+                cost_hist = res.history.cost   # (n_iters, B_chunk)
+                damping_hist = res.history.damping
+                accept_hist = res.history.accept
+                try:
+                    rec["cost_init"]  = float(cost_hist[0, b].item())
+                    rec["cost_final"] = float(res.history.final_cost[b].item())
+                    rec["n_iters"]    = int(res.history.n_iters)
+                    rec["converged"]  = bool(res.history.converged[b].item())
+                    rec["mean_damping_final"] = float(damping_hist[-1, b].item())
+                    rec["accept_rate"] = float(accept_hist[:, b].float().mean().item())
+                except Exception:
+                    pass
+            per_sample.append(rec)
+            ce_inits.append(ce_init)
+            ce_refineds.append(ce_ref)
+
+        per_sample_all.extend(per_sample)
+        # Store history from first chunk (all chunks have same n_iters for deterministic seeds)
+        if history_all is None and track_history and res.history is not None:
+            history_all = res.history
+
     t_ms = (time.perf_counter() - t0) * 1e3
 
-    per_sample: list[dict[str, Any]] = []
-    ce_inits: list[float] = []
-    ce_refineds: list[float] = []
-    for b, s in enumerate(samples):
-        H_init = res.H_init[b]
-        H_ref = res.H[b]
-        ce_init = _corner_error_safe(H_init, s.H_gt_pix, geom)
-        ce_ref = _corner_error_safe(H_ref, s.H_gt_pix, geom)
-        n_corr = int(res.per_frame[b][0].shape[0]) if res.per_frame is not None else -1
-        try:
-            det_init = float(np.linalg.det(H_init))
-        except Exception:
-            det_init = float("nan")
-        try:
-            det_ref = float(np.linalg.det(H_ref))
-        except Exception:
-            det_ref = float("nan")
-        try:
-            h_diff = float(np.linalg.norm(H_ref - H_init))
-        except Exception:
-            h_diff = float("nan")
-        rec: dict[str, Any] = {
-            "sample_id":     s.sample_id,
-            "n_corr":        n_corr,
-            "ce_init_px":    ce_init,
-            "ce_refined_px": ce_ref,
-            "dce_px":        (ce_init - ce_ref) if (_is_finite(ce_init) and _is_finite(ce_ref)) else float("nan"),
-            "H_init_det":    det_init,
-            "H_refined_det": det_ref,
-            "H_diff_fro":    h_diff,
-        }
-        if track_history and res.history is not None:
-            cost_hist = res.history.cost   # (n_iters, B)
-            damping_hist = res.history.damping
-            accept_hist = res.history.accept
-            try:
-                rec["cost_init"]  = float(cost_hist[0, b].item())
-                rec["cost_final"] = float(res.history.final_cost[b].item())
-                rec["n_iters"]    = int(res.history.n_iters)
-                rec["converged"]  = bool(res.history.converged[b].item())
-                rec["mean_damping_final"] = float(damping_hist[-1, b].item())
-                rec["accept_rate"] = float(accept_hist[:, b].float().mean().item())
-            except Exception:
-                pass
-        per_sample.append(rec)
-        ce_inits.append(ce_init)
-        ce_refineds.append(ce_ref)
+    # Aggregate metrics across all chunks
+    ce_inits_all = []
+    ce_refineds_all = []
+    for rec in per_sample_all:
+        if _is_finite(rec["ce_init_px"]):
+            ce_inits_all.append(rec["ce_init_px"])
+        if _is_finite(rec["ce_refined_px"]):
+            ce_refineds_all.append(rec["ce_refined_px"])
 
-    diag = per_sample_metrics(ce_inits, ce_refineds)
-    agg_ref = aggregate_corner_errors(ce_refineds)
-    agg_init = aggregate_corner_errors(ce_inits)
-    auc = auc_at_thresholds(ce_refineds)
+    diag = per_sample_metrics(ce_inits_all, ce_refineds_all)
+    agg_ref = aggregate_corner_errors(ce_refineds_all)
+    agg_init = aggregate_corner_errors(ce_inits_all)
+    auc = auc_at_thresholds(ce_refineds_all)
 
     metrics: dict[str, float] = {
         "ce_refined_median": agg_ref["median"],
@@ -529,19 +565,19 @@ def evaluate_config(
         **{k: float(v) for k, v in auc.items()},
     }
 
-    if track_history and res.history is not None:
+    if track_history and history_all is not None:
         try:
-            cost_init = res.history.cost[0].float()      # (B,)
-            cost_final = res.history.final_cost.float()   # (B,)
+            cost_init = history_all.cost[0].float()      # (B_all,)
+            cost_final = history_all.final_cost.float()   # (B_all,)
             denom = cost_init.clamp_min(1e-30)
             metrics["cost_drop_ratio"] = float(((cost_init - cost_final) / denom).mean().item())
-            metrics["accept_rate_mean"] = float(res.history.accept.float().mean().item())
-            metrics["convergence_rate"] = float(res.history.converged.float().mean().item())
-            metrics["n_iters_run"] = int(res.history.n_iters)
+            metrics["accept_rate_mean"] = float(history_all.accept.float().mean().item())
+            metrics["convergence_rate"] = float(history_all.converged.float().mean().item())
+            metrics["n_iters_run"] = int(history_all.n_iters)
         except Exception:
             pass
 
-    return {"per_sample": per_sample, "metrics": metrics, "history": res.history}
+    return {"per_sample": per_sample_all, "metrics": metrics, "history": history_all}
 
 
 # --------------------------------------------------------------------------- #
