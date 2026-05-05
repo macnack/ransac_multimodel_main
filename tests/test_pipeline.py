@@ -366,6 +366,146 @@ class TestPipelineBatched(unittest.TestCase):
             self.assertEqual(a_shape, (len(items),))
             self.assertEqual(a_dtype, torch.bool)
 
+    def test_lm_kwargs_pass_through_single(self):
+        """estimate_homography(lm_kwargs=...) must forward the dict to
+        refine_homography_torch_lm_torch (kwargs splat). Captures via
+        monkey-patch so we don't rely on observable LM behavior."""
+        from unittest import mock
+        import torch
+        from ransac_multimodel import pipeline
+
+        captured = {}
+
+        def _spy(*args, **kwargs):
+            captured.update(kwargs)
+            B = args[0].shape[0] if args[0].dim() == 3 else 1
+            return torch.eye(3, dtype=torch.float64).expand(B, 3, 3).clone()
+
+        with mock.patch.object(pipeline, "refine_homography_torch_lm_torch", side_effect=_spy):
+            pipeline.estimate_homography(
+                _load_logits(128),
+                backend="torch_cpu",
+                lm_kwargs={"init_damping": 0.5, "damping_up": 3.5},
+            )
+        self.assertEqual(captured.get("init_damping"), 0.5)
+        self.assertEqual(captured.get("damping_up"), 3.5)
+
+    def test_lm_kwargs_none_forwards_no_extra_single(self):
+        """lm_kwargs=None must behave like an empty dict in the splat."""
+        from unittest import mock
+        import torch
+        from ransac_multimodel import pipeline
+
+        captured = {}
+
+        def _spy(*args, **kwargs):
+            captured.update(kwargs)
+            B = args[0].shape[0] if args[0].dim() == 3 else 1
+            return torch.eye(3, dtype=torch.float64).expand(B, 3, 3).clone()
+
+        with mock.patch.object(pipeline, "refine_homography_torch_lm_torch", side_effect=_spy):
+            pipeline.estimate_homography(
+                _load_logits(128),
+                backend="torch_cpu",
+                lm_kwargs=None,
+            )
+
+        self.assertNotIn("init_damping", captured)
+        self.assertNotIn("damping_up", captured)
+        self.assertNotIn("damping_down", captured)
+        self.assertNotIn("barrier_k", captured)
+
+    def test_lm_kwargs_pass_through_batched(self):
+        """estimate_homography_batched(lm_kwargs=...) must forward the dict."""
+        from unittest import mock
+        import torch
+        from ransac_multimodel import pipeline
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        captured = {}
+
+        def _spy(*args, **kwargs):
+            captured.update(kwargs)
+            B = args[0].shape[0]
+            return torch.eye(3, dtype=torch.float64).expand(B, 3, 3).clone()
+
+        with mock.patch.object(pipeline, "refine_homography_torch_lm_torch", side_effect=_spy):
+            pipeline.estimate_homography_batched(
+                stacked,
+                backend="torch_cpu",
+                lm_kwargs={
+                    "init_damping": 0.5,
+                    "damping_down": 0.25,
+                    "barrier_k": 2.0,
+                    "abs_err_tolerance": 1e-9,
+                },
+            )
+        self.assertEqual(captured.get("init_damping"), 0.5)
+        self.assertEqual(captured.get("damping_down"), 0.25)
+        self.assertEqual(captured.get("barrier_k"), 2.0)
+        self.assertEqual(captured.get("abs_err_tolerance"), 1e-9)
+
+    def test_lm_kwargs_empty_dict_forwards_no_extra_batched(self):
+        """lm_kwargs={} must not add any user kwargs to the refine call."""
+        from unittest import mock
+        import torch
+        from ransac_multimodel import pipeline
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        captured = {}
+
+        def _spy(*args, **kwargs):
+            captured.update(kwargs)
+            B = args[0].shape[0]
+            return torch.eye(3, dtype=torch.float64).expand(B, 3, 3).clone()
+
+        with mock.patch.object(pipeline, "refine_homography_torch_lm_torch", side_effect=_spy):
+            pipeline.estimate_homography_batched(
+                stacked,
+                backend="torch_cpu",
+                lm_kwargs={},
+            )
+
+        self.assertNotIn("init_damping", captured)
+        self.assertNotIn("damping_up", captured)
+        self.assertNotIn("damping_down", captured)
+        self.assertNotIn("barrier_k", captured)
+
+    def test_lm_kwargs_conflict_with_explicit_succeeds(self):
+        """lm_kwargs f_scale takes precedence over the explicit param — no error.
+
+        The kwargs-conflict bug (Python TypeError on duplicate keyword) is
+        fixed: lm_kwargs values are popped first, explicit params are fallbacks.
+        """
+        import torch
+        from ransac_multimodel.pipeline import estimate_homography_batched
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+        H = estimate_homography_batched(
+            stacked,
+            backend="torch_cpu",
+            f_scale=2.0,
+            lm_kwargs={"f_scale": 4.0},
+        )
+        self.assertEqual(H.shape[0], len(_SAMPLE_IDS))
+
+    def test_lm_kwargs_default_none_changes_nothing(self):
+        """Default lm_kwargs=None must produce identical output to omitting it."""
+        import torch
+        from ransac_multimodel.pipeline import estimate_homography_batched
+
+        items = [_load_logits(sid) for sid in _SAMPLE_IDS]
+        stacked = torch.stack(items, dim=0)
+
+        H_default = estimate_homography_batched(stacked, backend="torch_cpu")
+        H_none = estimate_homography_batched(stacked, backend="torch_cpu", lm_kwargs=None)
+        self.assertTrue(np.allclose(H_default, H_none, atol=0.0))
+
     def test_batched_cuda_matches_cpu_within_float_noise(self):
         import torch
         if not torch.cuda.is_available():
