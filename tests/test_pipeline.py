@@ -475,21 +475,24 @@ class TestPipelineBatched(unittest.TestCase):
         self.assertNotIn("damping_down", captured)
         self.assertNotIn("barrier_k", captured)
 
-    def test_lm_kwargs_conflict_with_explicit_raises(self):
-        """Putting an already-explicit param (f_scale) in lm_kwargs must error
-        — Python's natural 'multiple values for keyword argument' TypeError."""
+    def test_lm_kwargs_conflict_with_explicit_succeeds(self):
+        """lm_kwargs f_scale takes precedence over the explicit param — no error.
+
+        The kwargs-conflict bug (Python TypeError on duplicate keyword) is
+        fixed: lm_kwargs values are popped first, explicit params are fallbacks.
+        """
         import torch
         from ransac_multimodel.pipeline import estimate_homography_batched
 
         items = [_load_logits(sid) for sid in _SAMPLE_IDS]
         stacked = torch.stack(items, dim=0)
-        with self.assertRaises(TypeError):
-            estimate_homography_batched(
-                stacked,
-                backend="torch_cpu",
-                f_scale=2.0,
-                lm_kwargs={"f_scale": 4.0},
-            )
+        H = estimate_homography_batched(
+            stacked,
+            backend="torch_cpu",
+            f_scale=2.0,
+            lm_kwargs={"f_scale": 4.0},
+        )
+        self.assertEqual(H.shape[0], len(_SAMPLE_IDS))
 
     def test_lm_kwargs_default_none_changes_nothing(self):
         """Default lm_kwargs=None must produce identical output to omitting it."""
